@@ -1,0 +1,87 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  password     String
+  firstName    String
+  lastName     String
+  role         Role         @default(MEMBER)
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  
+  // Relations
+  sentInvites  Invite[]     @relation("InviteSender")
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  domain    String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  users     User[]
+  invites   Invite[]
+  auditLogs AuditLog[]
+
+  @@map("organizations")
+}
+
+model Invite {
+  id             String       @id @default(cuid())
+  email          String
+  token          String       @unique
+  role           Role         @default(MEMBER)
+  organizationId String
+  senderId       String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  
+  // Relations
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sender         User         @relation("InviteSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@unique([email, organizationId])
+  @@map("invites")
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  action         String       // e.g., "USER_LOGIN", "INVITE_SENT", "INVITE_ACCEPTED"
+  details        Json?        // Additional details about the action
+  userId         String?
+  organizationId String
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime     @default(now())
+  
+  // Relations
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  MEMBER
+}
